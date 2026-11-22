@@ -66,3 +66,11 @@ Use `pixelhead_trainer.smoke_gate` (`verify_spatial_crop_equivariance_2d/3d` + `
 - **Symptom**: Inside `comfy/samplers.py`, `cfg_function` executes *after* `calc_cond_batch` exits its `try/finally` block!
 - **Root Cause**: If `close_step()` clears `current_step = None`, a `post_cfg_hook` writing only to `state.current_step` silently drops `cond_scale` and `denoised`!
 - **Fix**: In `post_cfg_hook`, always target `state.current_step if state.current_step is not None else state.last_valid_step` (implemented across all 5 `tap.py` modules).
+
+### Bug 6: High-Compression 3D Video `MSE` Posterior-Mean Blur & Synthetic Metric Inflation (`MiniMax-H3 v0.2.0` Case Study)
+- **Symptom**: On `MiniMax-H3` (`v0.2.0` Preview, [Wither033/ComfyUI-MiniMaxH3-PixelHead](https://github.com/Wither033/ComfyUI-MiniMaxH3-PixelHead)), aggregate held-out PSNR reached `31.03 dB` (`8.5×` faster, `45.7 MiB` vs `2.68 GB` ViT3D VAE), yet visual inspection revealed noticeable "plastic/soft-focus" smoothing on oil brushstrokes, eyes, and fast parallax occlusion (`25.91 dB`, `LPIPS = 0.29–0.37`).
+- **Root Causes**:
+  1. **Metric masking**: `25%` synthetic flat 2D cel/typography clips scored `36.73 dB` (`LPIPS = 0.0547`), masking `25.9–30.1 dB` natural-texture blur in the overall mean! Always report **per-regime PSNR + LPIPS** separately.
+  2. **`16×` heavier token decompression + high $\sigma_{\text{last}}$ without perceptual loss**: 1 `MiniMax-H3` DiT token spans `4 × 32 × 32 = 4,096` pixels (`16×` more than `16×16` 2D image tokens) and denoises from $\sigma_{\text{last}} = 0.6316$ (`video_shift=12.0`). Pure pixel `L1 + 5.0 × MSE` without perceptual `LPIPS-VGG` / FFT supervision drives a `24M`-param head to predict smooth conditional expectations over uncertain micro-textures.
+  3. **Premature `16px` latent folding**: `x0_hat_vid` (`[B, 24, T_lat, H_lat, W_lat]`) already lives natively at the `16px` grid (`2*gh × 2*gw`); folding it down to `32px` at entry discards native spatial sharpness instead of injecting it directly into the `16px` (`s16`) stage.
+- **Fix (`v3 Sharp` Roadmap)**: Inject native-resolution `x0_hat_vid` directly at the `16px` stage, add multi-scale `LPIPS-VGG` + 2D FFT high-frequency amplitude loss during Stage-2 sharpening, widen 3D trunks (`width >= 960`), and calibrate purely on high-resolution natural footage.

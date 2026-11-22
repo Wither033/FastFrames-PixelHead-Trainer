@@ -66,3 +66,11 @@
 - **现象**：在 `comfy/samplers.py` 内部，`cfg_function` 是在 `calc_cond_batch` 的 `try...finally` 块**完全退出之后**才被调用的！
 - **根因**：如果 `close_step()` 把 `state.current_step` 清成了 `None`，而 `post_cfg_hook` 只往 `state.current_step` 里写 `cond_scale` 和 `denoised`，就会静默丢掉 CFG 融合潜变量！
 - **解法**：在所有 `tap.py` 的 `post_cfg_hook` 中统一写入 `state.current_step if state.current_step is not None else state.last_valid_step`。
+
+### 坑 6：高压缩比 3D 视频头的「纯 `MSE` 回归均值磨皮陷阱」与平均分假象（`MiniMax-H3 v0.2.0` 实战复盘）
+- **现象**：在 `MiniMax-H3` 预览版（[Wither033/ComfyUI-MiniMaxH3-PixelHead](https://github.com/Wither033/ComfyUI-MiniMaxH3-PixelHead)）实训中，虽然总体平均分跑到了 `31.03 dB`（体积 `45.7 MiB` vs 官方 `2.68 GB` ViT3D VAE，提速 `8.5×`），但肉眼检视发现复杂油画笔触、人物眉眼与快速视差遮挡（`25.91 dB`，`LPIPS = 0.29~0.37`）存在明显的柔焦涂抹与塑料磨皮感。
+- **三大根因**：
+  1. **简单样本拉高平均分的假象**：校准集中占比 `25%` 的纯色扁平文字动画跑出了 `36.73 dB`（`LPIPS = 0.0547`），掩盖了真实复杂纹理子集只有 `25.9~30.1 dB` 的短板——**视频评测必须按纹理/运动复杂度拆表汇报 PSNR 与 LPIPS**。
+  2. **`16×` 解压负担 + 高末步噪声（$\sigma_{\text{last}} = 0.6316$）+ 缺少感知锐化损失**：`MiniMax-H3` 单个 DiT Token 需同时解压 `4帧 × 32×32 = 4,096` 个像素（负担为 `16×16` 图像头的 `16` 倍），且 `video_shift=12.0` 下 8 步末步起点噪声高达 `0.6316`。若训练期只用纯像素 `L1 + 5.0 × MSE` 而不加 VGG/LPIPS 感知损失与频域损失，`24M` 小网络面对不确定高频细节必然输出「平滑条件期望值（磨皮）」。
+  3. **`16px` 原生潜变量提前降采样折损**：`x0_hat_vid`（`[B, 24, T_lat, H_lat, W_lat]`）天生处于 `16px` 精细空间网格，在入口将其 `2×2` 折叠进 `32px` 粗网格损失了一半直接定位锐度。
+- **解法（`v3 Sharp` 升级路线）**：在 `16px`（`s16`）阶段原位跨层直注未折叠的 `24ch` `x0_hat_vid`，在训练后半程挂载多尺度 `LPIPS-VGG` + 2D FFT 高频幅度损失，将 3D 主干拓宽至 `width >= 960`，并剔除纯色合成块、改用纯高细节自然运动片段训练。
