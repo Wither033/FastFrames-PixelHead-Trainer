@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixelhead-trainer"
+version = "1.0.0"
+description = "Clean-room training toolkit, DiT surgery playbook, and Colab L4 pipelines for Zero-VAE Direct Pixel Readout Heads (2D Image & 3D Causal Video) in ComfyUI."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+    "torch>=2.2.0",
+    "safetensors>=0.4.2",
+]
+
+[project.urls]
+Repository = "https://github.com/Wither033/FastFrames-PixelHead-Trainer"
+HuggingFaceCollection = "https://huggingface.co/collections/pocis/fastframes-zero-vae-direct-pixelheads-comfyui-6b031df8e9212f8bae294154"
+
+[tool.setuptools.packages.find]
+include = ["pixelhead_trainer*"]
