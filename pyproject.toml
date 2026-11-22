@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pixelhead-trainer"
 version = "1.0.0"
-description = "Clean-room training toolkit, DiT surgery playbook, and Colab L4 pipelines for Zero-VAE Direct Pixel Readout Heads (2D Image & 3D Causal Video) in ComfyUI."
+description = "PyTorch toolkit, DiT hook notes, and Colab L4 scripts for training direct pixel readout heads in ComfyUI."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }

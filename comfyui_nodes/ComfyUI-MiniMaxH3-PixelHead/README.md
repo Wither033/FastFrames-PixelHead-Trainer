@@ -1,7 +1,7 @@
 # ComfyUI-MiniMaxH3-PixelHead *(Experimental Preview `v0.2.0` — Not Recommended for Production Yet)*
 
 > [!WARNING]
-> **⚠️ Experimental Preview (`v0.2.0`) — Not Recommended for Production Use Yet (`v3 Sharp` Optimization Upcoming)**
+> **⚠Experimental Preview (`v0.2.0`) — Not Recommended for Production Use Yet (`v3 Sharp` Optimization Upcoming)**
 >
 > Standalone repository & weights:
 > - **GitHub**: https://github.com/Wither033/ComfyUI-MiniMaxH3-PixelHead
