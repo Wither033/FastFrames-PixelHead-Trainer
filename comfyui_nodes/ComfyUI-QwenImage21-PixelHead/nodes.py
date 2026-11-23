@@ -1,4 +1,4 @@
-"""ComfyUI Nodes for Qwen-Image 2.1 Direct Pixel Head (Zero-VAE RGB & RGBA Decoding).
+"""ComfyUI Nodes for Qwen-Image 2.1 Direct Pixel Head (Zero-VAE RGB & RGBA Decoding, v0.1 / v0.2 / v0.3).
 
 License: MIT
 """
@@ -15,7 +15,9 @@ import torch
 
 from .qwen21_pixel_head import (
     QwenImage21PixelHeadV2,
+    QwenImage21PixelHeadV3,
     QwenImage21PixelHeadX2,
+    decode_pixel_head_tiled,
     load_qwen21_pixel_head,
 )
 from .tap import attach_qwen21_tap
@@ -38,7 +40,11 @@ def _list_candidate_files() -> list[str]:
                 if fn.endswith(".safetensors") and fn not in seen:
                     seen.add(fn)
                     items.append(fn)
-    return sorted(items) if items else ["qwen_image_2.1_pixel_head_bf16.safetensors", "qwen_image_2.1_pixel_head.safetensors"]
+    return sorted(items) if items else [
+        "qwen_image_2.1_pixel_head_v03_bf16.safetensors",
+        "qwen_image_2.1_pixel_head_v02_bf16.safetensors",
+        "qwen_image_2.1_pixel_head_bf16.safetensors",
+    ]
 
 
 def _resolve_head_path(name: str) -> str:
@@ -69,8 +75,8 @@ class QwenImage21PixelHeadLoader:
     CATEGORY = "advanced/qwen_image21"
     TITLE = "Load Qwen-Image 2.1 Pixel Head"
     DESCRIPTION = (
-        "Load Qwen-Image 2.1 Direct RGBA Pixel Head (~49 MB BF16 / ~97 MB FP32) from models/pixel_heads or models/vae.\n"
-        "从 models/pixel_heads 或 models/vae 加载 Qwen-Image 2.1 免 VAE 直出像素头权重。"
+        "Load Qwen-Image 2.1 Direct RGBA Pixel Head (v0.1 / v0.2 / v0.3) from models/pixel_heads or models/vae.\n"
+        "从 models/pixel_heads 或 models/vae 加载 Qwen-Image 2.1 免 VAE 直出像素头权重（自动识别 v0.1 / v0.2 / v0.3）。"
     )
 
     def load_head(self, head_name: str, precision: str):
@@ -113,7 +119,10 @@ class QwenImage21PixelDecode:
                 "pixel_head": ("QWEN21_PIXEL_HEAD",),
                 "pixel_tap": ("QWEN21_TAP",),
                 "output_scale": (["auto", "1x", "2x"], {"default": "auto"}),
-            }
+            },
+            "optional": {
+                "tile_mode": (["auto", "disabled", "tiled_1024"], {"default": "auto"}),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "MASK", "IMAGE")
@@ -122,17 +131,17 @@ class QwenImage21PixelDecode:
     CATEGORY = "advanced/qwen_image21"
     TITLE = "Qwen-Image 2.1 Pixel Decode (Zero VAE)"
     DESCRIPTION = (
-        "Replaces VAEDecode: decodes Qwen-Image 2.1 features directly to RGB + Alpha in ~5 ms with zero VAE VRAM.\n"
-        "替代 VAEDecode：无需加载 644MB VAE，约 5 毫秒极速直出高清 RGB、Alpha 蒙版与 4 通道 RGBA 图像。"
+        "Replaces VAEDecode: decodes Qwen-Image 2.1 features directly to RGB + Alpha with zero VAE VRAM.\n"
+        "替代 VAEDecode：无需加载 644MB VAE，毫秒级极速直出高清 RGB、Alpha 蒙版与 4 通道 RGBA 图像（支持 2K/4K 无缝分块）。"
     )
 
     @torch.no_grad()
-    def decode(self, samples, pixel_head, pixel_tap, output_scale: str = "auto"):
-        # `samples` dependency guarantees ComfyUI executes KSampler BEFORE this decode node!
+    def decode(self, samples, pixel_head, pixel_tap, output_scale: str = "auto", tile_mode: str = "auto"):
         _ = samples["samples"]
         f_cpu, x0_hat_cpu, sigma = pixel_tap.resolve_final_features()
 
         device = comfy.model_management.get_torch_device()
+        is_v3 = isinstance(pixel_head, QwenImage21PixelHeadV3)
         is_v2 = isinstance(pixel_head, QwenImage21PixelHeadV2)
         is_x2 = isinstance(pixel_head, QwenImage21PixelHeadX2)
         if output_scale == "auto":
@@ -147,28 +156,34 @@ class QwenImage21PixelDecode:
             scale = 1
 
         head_dev = pixel_head.to(device)
-        trunk_dtype = head_dev.base.feat_proj.weight.dtype if (is_x2 or is_v2) else head_dev.feat_proj.weight.dtype
-        f_dev = f_cpu.to(device=device, dtype=trunk_dtype)
-        x_dev = x0_hat_cpu.to(device=device, dtype=trunk_dtype)
+        trunk_dtype = head_dev.base.feat_proj.weight.dtype if (is_x2 or is_v2 or is_v3) else head_dev.feat_proj.weight.dtype
+
+        gh, gw = x0_hat_cpu.shape[-2], x0_hat_cpu.shape[-1]
+        use_tiled = (tile_mode == "tiled_1024") or (tile_mode == "auto" and (gh * gw > 96 * 96))
 
         if torch.cuda.is_available() and device.type == "cuda":
             torch.cuda.synchronize(device)
         t0 = time.perf_counter()
 
-        if is_v2:
-            out_nchw = head_dev(f_dev, x_dev, sigma=sigma)
-        elif is_x2:
-            out_nchw = head_dev(f_dev, x_dev, scale=scale)
+        if use_tiled:
+            f_dev = f_cpu.to(device=device, dtype=trunk_dtype)
+            x_dev = x0_hat_cpu.to(device=device, dtype=trunk_dtype)
+            out_nchw = decode_pixel_head_tiled(head_dev, f_dev, x_dev, sigma=sigma, scale=scale, tile_tokens=64, overlap_tokens=8)
         else:
-            out_nchw = head_dev(f_dev, x_dev)
+            f_dev = f_cpu.to(device=device, dtype=trunk_dtype)
+            x_dev = x0_hat_cpu.to(device=device, dtype=trunk_dtype)
+            if is_v3 or is_v2:
+                out_nchw = head_dev(f_dev, x_dev, sigma=sigma)
+            elif is_x2:
+                out_nchw = head_dev(f_dev, x_dev, scale=scale)
+            else:
+                out_nchw = head_dev(f_dev, x_dev)
 
         if torch.cuda.is_available() and device.type == "cuda":
             torch.cuda.synchronize(device)
         dt_ms = (time.perf_counter() - t0) * 1000.0
 
-        # Convert [-1, 1] NCHW -> [0, 1] NHWC ComfyUI IMAGE format
         out_nhwc = ((out_nchw.float() + 1.0) * 0.5).clamp_(0.0, 1.0).movedim(1, -1).cpu()
-        # Return head to CPU so idle VRAM stays zero
         pixel_head.to("cpu")
 
         if out_nhwc.shape[-1] == 4:
@@ -181,7 +196,7 @@ class QwenImage21PixelDecode:
             rgba = torch.cat([rgb, alpha.unsqueeze(-1)], dim=-1)
 
         logger.info(
-            f"[Qwen21PixelDecode] Decoded {tuple(rgb.shape[1:3])} (scale={scale}x, last_sigma={sigma:.4f}) in {dt_ms:.2f} ms (Zero VAE)"
+            f"[Qwen21PixelDecode] Decoded {tuple(rgb.shape[1:3])} (scale={scale}x, tiled={use_tiled}, last_sigma={sigma:.4f}) in {dt_ms:.2f} ms"
         )
         return (rgb, alpha, rgba)
 
