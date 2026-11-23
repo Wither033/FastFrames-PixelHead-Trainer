@@ -14,6 +14,7 @@ import folder_paths
 import torch
 
 from .qwen21_pixel_head import (
+    QwenImage21PixelHeadV2,
     QwenImage21PixelHeadX2,
     load_qwen21_pixel_head,
 )
@@ -132,6 +133,7 @@ class QwenImage21PixelDecode:
         f_cpu, x0_hat_cpu, sigma = pixel_tap.resolve_final_features()
 
         device = comfy.model_management.get_torch_device()
+        is_v2 = isinstance(pixel_head, QwenImage21PixelHeadV2)
         is_x2 = isinstance(pixel_head, QwenImage21PixelHeadX2)
         if output_scale == "auto":
             scale = 2 if is_x2 else 1
@@ -145,7 +147,7 @@ class QwenImage21PixelDecode:
             scale = 1
 
         head_dev = pixel_head.to(device)
-        trunk_dtype = head_dev.base.feat_proj.weight.dtype if is_x2 else head_dev.feat_proj.weight.dtype
+        trunk_dtype = head_dev.base.feat_proj.weight.dtype if (is_x2 or is_v2) else head_dev.feat_proj.weight.dtype
         f_dev = f_cpu.to(device=device, dtype=trunk_dtype)
         x_dev = x0_hat_cpu.to(device=device, dtype=trunk_dtype)
 
@@ -153,7 +155,9 @@ class QwenImage21PixelDecode:
             torch.cuda.synchronize(device)
         t0 = time.perf_counter()
 
-        if is_x2:
+        if is_v2:
+            out_nchw = head_dev(f_dev, x_dev, sigma=sigma)
+        elif is_x2:
             out_nchw = head_dev(f_dev, x_dev, scale=scale)
         else:
             out_nchw = head_dev(f_dev, x_dev)
