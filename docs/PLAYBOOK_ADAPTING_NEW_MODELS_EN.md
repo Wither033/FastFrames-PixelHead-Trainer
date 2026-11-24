@@ -1,6 +1,6 @@
 # Adapting Direct Pixel Readout Heads to New DiT Backbones (Notes & Debugging Log)
 
-This document summarizes the five steps we use when adapting a direct pixel readout head to a new 2D image or 3D video DiT in ComfyUI, followed by six issues we ran into while implementing `Qwen-Image 2.1`, `Krea-2`, `FLUX.3-Klein`, `LTX-2.5`, and `MiniMax-H3`.
+This document summarizes the five steps we use when adapting a direct pixel readout head to a new 2D image or 3D video DiT in ComfyUI, followed by seven lessons and issues we ran into while implementing `Qwen-Image 2.1`, `Krea-2`, `FLUX.3-Klein`, `LTX-2.5`, and `MiniMax-H3`.
 
 ---
 
@@ -39,7 +39,7 @@ Run `verify_spatial_crop_equivariance_2d/3d` and a 90-step P0 smoke check (`pixe
 
 ---
 
-## Part 2: Six Issues Encountered During Development
+## Part 2: Seven Issues & Architecture Lessons During Development
 
 ### 1. Non-`None` Return Value in a `lambda` Pre-Hook (`EinopsError: 2282 != 2304`)
 - **What happened**: `mod.register_forward_pre_hook(lambda _m, inp: cap.setdefault("f", inp[0][:, -img_tokens:, :].detach()))` failed inside `SingleStreamDiT` unpatchify.
@@ -73,3 +73,15 @@ Run `verify_spatial_crop_equivariance_2d/3d` and a 90-step P0 smoke check (`pixe
   2. Each `MiniMax-H3` DiT token covers `4 × 32 × 32 = 4,096` pixels (`16×` more than `16×16` 2D image tokens) and denoises from $\sigma_{\text{last}} = 0.6316$ (`video_shift = 12.0`). Without perceptual (`LPIPS-VGG`) or frequency-domain losses, `5.0 × MSE` pushes a `24M`-param trunk to output smooth conditional averages over fine textures.
   3. `x0_hat_vid` (`[B, 24, T_lat, H_lat, W_lat]`) already sits on the `16px` spatial grid; folding it `2×2` down to the `32px` entry layer discards native `16px` spatial localization.
 - **Planned changes**: Inject `x0_hat_vid` directly at the `16px` (`s16`) stage, add `LPIPS-VGG` + 2D FFT amplitude loss in a second sharpening stage, increase trunk width (`width >= 960`), and train on higher-resolution natural clips without synthetic flat filler.
+
+
+### 7. Recovering `1–2px` Micro-Detail Without Full-Resolution Norm Bottlenecks (`Qwen-Image 2.1 v0.1 → v0.2 → v0.3`)
+- **What happened**: `v0.1` (`8×8` linear unpatchify, `7.77 ms` on L4 `1024²`) softened `2px` ticket text and portrait pores (`LPIPS = 0.1272`). `v0.2` added a full `16px → 8px → 4px → 2px → 1px` pyramid with `GroupNorm + depthwise` blocks and `LPIPS + FFT` supervision, cutting `LPIPS` to `0.0808` (`+0.40 dB` PSNR), but latency rose `14.8×` to `115.05 ms` (`904 MiB` peak activation VRAM) and `1px` copperplate cross-hatching barely moved (`26.82 → 26.85 dB`).
+- **Causes**:
+  1. `GroupNorm` + depthwise separable convolutions at `1024×1024` are memory-bandwidth bound on consumer/cloud GPUs.
+  2. Injecting `x0_hat_norm` only via a `1×1` per-token linear projection forces deeper layers to re-infer cross-token diagonal stroke continuity from scratch.
+  3. Standard pixel-space GANs trade off `0.5–1.5 dB` of PSNR via low-frequency color/luminance shifts.
+- **Fix (`v0.3`)**:
+  1. Stop neural layers at `512×512` (`2px`), use norm-free `3×3` `WaveletConvBlock2d` blocks to predict 2D Haar wavelet subbands `(LL, LH, HL, HH)`, and reconstruct `1024×1024` via analytical `0`-parameter `idwt_haar_2d` (`37.51 ms` on L4 — `3.07×` faster than `v0.2`, `504 MiB` VRAM).
+  2. Add `LatentSpatialHighway` (`3×3` convs on `64`-ch `x0_hat_norm` injected at `8px`, `4px`, and `2px`).
+  3. Train a Wavelet PatchGAN on `torch.cat([LL.detach(), LH, HL, HH], dim=1)` so adversarial gradients sharpen edges without shifting `LL` luminance, reaching **`33.81 dB` PSNR** (`39.17 dB` on portraits, `+0.56 dB` on etchings) and **`0.0736` LPIPS**.

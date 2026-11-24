@@ -89,6 +89,28 @@ def test_all_five_comfyui_model_heads() -> None:
     hq = qwen.QwenImage21PixelHead(width=128)
     assert verify_spatial_crop_equivariance_2d(hq, 4096, 64, 16, 11, 14, 8, 10, 3) < 1e-5
 
+    # Verify QwenImage21PixelHeadV3 Haar DWT invertibility, v2->v3 warm-start, tiling, and safetensors round-trip
+    img_test = torch.randn(1, 4, 64, 96)
+    haar_err = float((qwen.idwt_haar_2d(*qwen.dwt_haar_2d(img_test)) - img_test).abs().max().item())
+    assert haar_err < 1e-6, f"Haar DWT invertibility error too high: {haar_err}"
+    hq_v2 = qwen.QwenImage21PixelHeadV2(base=hq, c_4px=64, c_2px=32, c_1px=16).eval()
+    hq_v3 = qwen.QwenImage21PixelHeadV3.from_v2(hq_v2, c_2px=32).eval()
+    with torch.no_grad():
+        f_q3 = torch.randn(1, 6, 8, 4096)
+        x_q3 = torch.randn(1, 64, 6, 8)
+        out_q3 = hq_v3(f_q3, x_q3, sigma=0.18)
+        assert out_q3.shape == (1, 4, 96, 128) and torch.isfinite(out_q3).all()
+        tiled_q3 = qwen.decode_pixel_head_tiled(hq_v3, f_q3, x_q3, sigma=0.18, tile_tokens=4, overlap_tokens=2)
+        assert tiled_q3.shape == out_q3.shape and torch.isfinite(tiled_q3).all()
+    with tempfile.TemporaryDirectory() as td:
+        p3_fp32 = Path(td) / "qwen_v3.safetensors"
+        p3_bf16 = Path(td) / "qwen_v3_bf16.safetensors"
+        qwen.save_qwen21_pixel_head(hq_v3, p3_fp32, save_bf16_trunk=False)
+        qwen.save_qwen21_pixel_head(hq_v3, p3_bf16, save_bf16_trunk=True)
+        hq_v3_loaded = qwen.load_qwen21_pixel_head(p3_bf16, dtype=torch.bfloat16)
+        assert isinstance(hq_v3_loaded, qwen.QwenImage21PixelHeadV3)
+        assert hq_v3_loaded.wavelet_out.weight.dtype == torch.float32
+
     krea = _load_mod("krea2_ph", "comfyui_nodes/ComfyUI-Krea2-PixelHead/krea2_pixel_head.py")
     hk = krea.Krea2PixelHead(width=128)
     assert verify_spatial_crop_equivariance_2d(hk, 6144, 64, 16, 11, 14, 8, 10, 3) < 1e-5

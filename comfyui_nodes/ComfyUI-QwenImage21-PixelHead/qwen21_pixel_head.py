@@ -8,7 +8,7 @@ Supports:
   - `QwenImage21PixelHeadV3` (`v0.3` Fast Haar-Wavelet + Multi-Scale Latent Spatial Highway Edition:
     predicts 512x512 2D Haar wavelet subbands `(LL, LH, HL, HH)` with norm-free fused blocks +
     0-parameter analytical `iDWT` to 1024x1024 + direct `x0_hat` 3x3 spatial conv highway,
-    achieving ~5-6x faster inference than v0.2 with sharper 1-2px small text & cross-hatching)
+    achieving 3.07x faster inference than v0.2 (37.5 ms / 17.9x vs VAE on L4 1024^2) with -44% VRAM and sharper micro-detail)
 """
 
 from __future__ import annotations
@@ -650,16 +650,21 @@ def decode_pixel_head_tiled(
     acc = torch.zeros((bsz, out_c, out_h, out_w), device="cpu", dtype=torch.float32)
     w_sum = torch.zeros((1, 1, out_h, out_w), device="cpu", dtype=torch.float32)
 
-    stride = max(8, tile_tokens - overlap_tokens)
-    ys = list(range(0, max(1, gh - tile_tokens + stride), stride))
-    xs = list(range(0, max(1, gw - tile_tokens + stride), stride))
-    if ys[-1] + tile_tokens < gh:
-        ys.append(max(0, gh - tile_tokens))
-    if xs[-1] + tile_tokens < gw:
-        xs.append(max(0, gw - tile_tokens))
+    stride = max(1, tile_tokens - overlap_tokens)
+
+    def _tile_starts(total: int) -> list[int]:
+        if total <= tile_tokens:
+            return [0]
+        starts = list(range(0, total - tile_tokens, stride))
+        starts.append(total - tile_tokens)
+        return starts
+
+    ys = _tile_starts(gh)
+    xs = _tile_starts(gw)
 
     def _ramp_1d(length: int, ov: int, at_start: bool, at_end: bool) -> torch.Tensor:
         w = torch.ones(length, dtype=torch.float32)
+        ov = min(ov, length)
         if not at_start and ov > 0:
             t = torch.linspace(0.0, math.pi, ov, dtype=torch.float32)
             w[:ov] = 0.5 * (1.0 - torch.cos(t))

@@ -1,6 +1,6 @@
 # FastFrames-PixelHead-Trainer
 
-Training code, model-adaptation notes, and single-GPU Colab L4 notebooks for building direct pixel readout heads across 2D image and 3D video Diffusion Transformers (DiTs) in ComfyUI.
+Training code, model-adaptation notes, and single-GPU Colab L4/A100 notebooks for building direct pixel readout heads across 2D image and 3D video Diffusion Transformers (DiTs) in ComfyUI.
 
 [English](README.md) | [简体中文](README_zh.md) | [Adaptation Notes & Post-Mortems (EN)](docs/PLAYBOOK_ADAPTING_NEW_MODELS_EN.md) | [新模型适配与问题记录 (ZH)](docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md)
 
@@ -13,7 +13,7 @@ Flow-matching DiTs carry `3072`–`6144` channels per token right before their f
 
 Following the direct pixel readout formulation in [*FastFrames: Video Generation at Interactive Latency* (`arXiv:2611.23226`)](https://arxiv.org/abs/2611.23226) and single-step Replay Buffer distillation (`sorryhyun/anima-pixel-decoder`), this repository collects our clean-room MIT PyTorch library (`pixelhead_trainer`), ComfyUI `ModelPatcher` tap implementations for five backbones, and the Colab L4 (24 GB) training scripts used to train them:
 
-- On 2D image models (`16×16` pixels/token), a `~49–53 MiB` (BF16) ConvNeXt + PixelShuffle head decodes `24×–67×` faster than the stock VAE (`5.55 ms` on Qwen-Image 2.1, `59.55 ms` on Krea-2) at `33.3–33.9 dB` mean PSNR, with optional single-pass `2x` (`1024 → 2048`) upscaling.
+- On 2D image models (`16×16` pixels/token), a `48.8–79.3 MiB` (BF16) head decodes `17.9×–86.4×` faster than the stock VAE (`37.51 ms` / `33.81 dB` / `LPIPS 0.0736` on **Qwen-Image 2.1 `v0.3` Wavelet**; `5.55–7.77 ms` on `v0.1` Fast; `59.55 ms` / `33.33 dB` on **Krea-2**), with optional single-pass `2x` (`1024 → 2048`) upscaling.
 - On high-compression 3D video models (`4 × 32×32` or `8 × 32×32` pixels/token), pure pixel-space `MSE` distillation is fast (`8.5×` on MiniMax-H3) but over-smooths fine natural textures unless paired with perceptual/frequency losses — documented in full in [docs/PLAYBOOK_ADAPTING_NEW_MODELS_EN.md](docs/PLAYBOOK_ADAPTING_NEW_MODELS_EN.md).
 
 | `Qwen-Image 2.1` (`5.55 ms`, `67.1×`, `33.91 dB`, 4-ch RGBA) | `Krea-2` (`59.55 ms`, `24.7×`, `33.33 dB`, `6144d` bridge) |
@@ -26,7 +26,8 @@ Each DiT has an independent pre-linear hidden space and needs its own pixel head
 
 | Backbone | Modality | Notebook (`notebooks/`) | ComfyUI Node | Weights | Status & Benchmark (L4) |
 | :--- | :---: | :--- | :--- | :--- | :--- |
-| **Qwen-Image 2.1** | 2D RGBA (`1x` & `2x`) | [`01_Train_QwenImage21...ipynb`](notebooks/01_Train_QwenImage21_PixelHead_Colab_L4.ipynb) | [Wither033/ComfyUI-QwenImage21-PixelHead](https://github.com/Wither033/ComfyUI-QwenImage21-PixelHead) | [pocis/Qwen-Image-2.1-PixelHead](https://huggingface.co/pocis/Qwen-Image-2.1-PixelHead) | Ready · `5.55 ms` (`67.1×`), `33.91 dB`, `48.8 MiB` BF16 |
+| **Qwen-Image 2.1 (`v0.3` Wavelet)** | 2D RGBA (`1x` Haar Wavelet) | [`07_Train_QwenImage21...v03...ipynb`](notebooks/07_Train_QwenImage21_PixelHead_v03_Colab_A100.ipynb) | [Wither033/ComfyUI-QwenImage21-PixelHead](https://github.com/Wither033/ComfyUI-QwenImage21-PixelHead) | [pocis/Qwen-Image-2.1-PixelHead](https://huggingface.co/pocis/Qwen-Image-2.1-PixelHead) | Ready · **`37.51 ms` (`17.9×`), `33.81 dB`, `LPIPS 0.0736`**, `79.3 MiB` BF16 |
+| **Qwen-Image 2.1 (`v0.1` / `v0.2`)** | 2D RGBA (`1x` & `2x`) | [`01_...L4.ipynb`](notebooks/01_Train_QwenImage21_PixelHead_Colab_L4.ipynb) / [`06_...v02.ipynb`](notebooks/06_Train_QwenImage21_PixelHead_v02_Colab_A100.ipynb) | [Wither033/ComfyUI-QwenImage21-PixelHead](https://github.com/Wither033/ComfyUI-QwenImage21-PixelHead) | [pocis/Qwen-Image-2.1-PixelHead](https://huggingface.co/pocis/Qwen-Image-2.1-PixelHead) | Ready · `v0.1`: `7.77 ms` (`86.4×`), `48.8 MiB`; `v0.2`: `115.05 ms`, `78.5 MiB` |
 | **Krea-2** | 2D RGB (`1x` & `2x`) | [`02_Train_Krea2...ipynb`](notebooks/02_Train_Krea2_PixelHead_Colab_L4.ipynb) | [Wither033/ComfyUI-Krea2-PixelHead](https://github.com/Wither033/ComfyUI-Krea2-PixelHead) | [pocis/Krea-2-PixelHead](https://huggingface.co/pocis/Krea-2-PixelHead) | Ready · `59.55 ms` (`24.7×`), `33.33 dB`, `52.6 MiB` BF16 |
 | **FLUX.3-Image-Klein** | 2D RGB (`1x` & `2x`) | [`03_Train_Flux3Klein...ipynb`](notebooks/03_Train_Flux3Klein_PixelHead_Colab_L4.ipynb) | [`comfyui_nodes/ComfyUI-Flux3-PixelHead`](comfyui_nodes/ComfyUI-Flux3-PixelHead) | Not trained yet | Script ready (`24.41M` params, `46.6 MiB` BF16) |
 | **LTX-2.5** | 3D Video (`8*T-7` causal) | [`04_Train_LTX25_Video...ipynb`](notebooks/04_Train_LTX25_VideoPixelHead_v2_Colab_L4.ipynb) | [`comfyui_nodes/ComfyUI-LTX25-PixelHead`](comfyui_nodes/ComfyUI-LTX25-PixelHead) | Not trained yet | `v2` script ready (`23.87M` params, `2.67×` overcomplete) |
@@ -53,6 +54,15 @@ $$\hat{x}_0 = x_t - \sigma_{\text{last}} \cdot v$$
 3. **Keep the final linear projection overcomplete**: At the final spatial/temporal grid, keep channel width `w_final >= 2.5 × out_dim`. On `32×32`-per-token 3D video models, use three `2×` `PixelShuffle` stages down to a `4×4` spatial grid (`256 → 96` or `256 → 48`) instead of stopping at `8×8` (`256 → 1536` rank bottleneck).
 4. **Run `out_proj` in `FP32`**: Wrap the final linear layer in `torch.autocast(..., enabled=False)` and keep its weights in `float32` inside BF16 `.safetensors` files to avoid `1–2` level quantization banding.
 5. **Distill `TeacherVAE.decode(x0_hat)` rather than raw ground-truth images**: At finite $\sigma_{\text{last}}$, $\hat{x}_0$ has already lost part of the original noise-masked micro-detail; training against `TeacherVAE.decode(x0_hat)` provides a deterministic target.
+
+### 3.3 High-Frequency Wavelet Upgrade (`Qwen-Image 2.1 v0.1 → v0.2 → v0.3`)
+
+On `1024×1024` close-up portraits, slanted barcode print, and `1px` copperplate cross-hatching, `v0.3` ([`07_Train_QwenImage21_PixelHead_v03_Colab_A100.ipynb`](notebooks/07_Train_QwenImage21_PixelHead_v03_Colab_A100.ipynb), runnable on a single 24 GB L4) combines three additions:
+1. **2D Haar Wavelet subband readout (`512×512` `(LL, LH, HL, HH)` + analytical `iDWT`)**: Avoids full-resolution `1024×1024` `GroupNorm + depthwise` memory traffic, running **`3.07×` faster than `v0.2`** (`37.51 ms` vs `115.05 ms` on L4) with **`-44.2%` peak activation VRAM** (`504 MiB` vs `904 MiB`).
+2. **Multi-Scale `LatentSpatialHighway`**: Applies `3×3` spatial convolutions directly on `64`-ch `x0_hat_norm` across `8px`, `4px`, and `2px` grids to preserve cross-token stroke continuity.
+3. **Detached-`LL` High-Frequency Wavelet PatchGAN**: Applies Hinge adversarial loss strictly to `(LH, HL, HH)` with `LL.detach()`, sharpening fine detail (`LPIPS 0.1272 → 0.0808 → 0.0736`) while simultaneously raising `PSNR` (`32.62 → 33.02 → 33.81 dB`; portraits reach `39.17 dB`).
+
+![Qwen-Image 2.1 v0.3 4-way 1:1 comparison](assets/qwen21_v03_hero_1to1.png)
 
 ## 4. ComfyUI Backbone Hook Reference
 

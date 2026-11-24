@@ -1,6 +1,6 @@
 # FastFrames-PixelHead-Trainer
 
-面向 ComfyUI 扩散模型（2D 图像与 3D 视频 DiT）的免 VAE 像素直出头（Direct Pixel Head）训练代码、各底座源码挂载整理及单卡 Colab L4 训练脚本。
+面向 ComfyUI 扩散模型（2D 图像与 3D 视频 DiT）的免 VAE 像素直出头（Direct Pixel Head）训练代码、各底座源码挂载整理及单卡 Colab L4/A100 训练脚本。
 
 [English](README.md) | [简体中文](README_zh.md) | [新模型适配流程与踩坑记录 (ZH)](docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md) | [Adaptation Notes & Post-Mortems (EN)](docs/PLAYBOOK_ADAPTING_NEW_MODELS_EN.md)
 
@@ -13,7 +13,7 @@
 
 本项目参考 Apple Research 论文 [*FastFrames* (`arXiv:2611.23226`)](https://arxiv.org/abs/2611.23226) 的直接像素读出结构与 `sorryhyun/anima-pixel-decoder` 的单步加噪重放池（Replay Buffer）蒸馏思路，把我们自己独立编写的通用 PyTorch 训练库 `pixelhead_trainer`、5 个底座模型的 ComfyUI 特征截获代码以及单张 Colab L4（24GB）训练 Notebook 整理开源：
 
-- 在 `16×16` 像素/Token 的 **2D 图像模型**（如 `Qwen-Image 2.1`、`Krea-2`）上，约 `49～53 MiB`（BF16）的像素头可以把解码时间缩短 `24～67` 倍（`5.55 ms` / `59.55 ms`），测试集均值 `33.3～33.9 dB` PSNR，并支持二阶 `2x`（`1024 → 2048`）一步放大输出。
+- 在 `16×16` 像素/Token 的 **2D 图像模型**上，`48.8～79.3 MiB`（BF16）的像素头可将解码耗时缩短 `17.9～86.4` 倍（其中 **`Qwen-Image 2.1 v0.3` 小波高保真版**在 L4 `1024²` 下耗时 `37.51 ms`、均值 `33.81 dB`、`LPIPS 0.0736`；`v0.1` 快速版耗时 `5.55～7.77 ms`；**`Krea-2`** 耗时 `59.55 ms`、均值 `33.33 dB`），并支持二阶 `2x`（`1024 → 2048`）一步放大输出。
 - 在单 Token 覆盖 `4×32×32` 甚至 `8×32×32` 像素的 **高压缩比 3D 视频模型**（如 `MiniMax-H3`）上，实测如果只用纯像素空间 `MSE` 训练，虽然解码速度快 `8.5` 倍，但复杂自然纹理会出现明显的平滑涂抹感——相关原因与改进方向均已如实记录在 [docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md](docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md) 中。
 
 | `Qwen-Image 2.1`（`5.55 ms`，`67.1×`，均值 `33.91 dB`，4 通道 RGBA） | `Krea-2`（`59.55 ms`，`24.7×`，均值 `33.33 dB`，`6144d` 降维桥） |
@@ -26,7 +26,8 @@
 
 | 底座模型 | 模态规格 | 训练脚本 (`notebooks/`) | ComfyUI 节点仓库 | Hugging Face 权重 | 当前状态与实测数据（L4） |
 | :--- | :---: | :--- | :--- | :--- | :--- |
-| **Qwen-Image 2.1** | 2D RGBA (`1x` & `2x`) | [`01_Train_QwenImage21...ipynb`](notebooks/01_Train_QwenImage21_PixelHead_Colab_L4.ipynb) | [Wither033/ComfyUI-QwenImage21-PixelHead](https://github.com/Wither033/ComfyUI-QwenImage21-PixelHead) | [pocis/Qwen-Image-2.1-PixelHead](https://huggingface.co/pocis/Qwen-Image-2.1-PixelHead) | 可正常使用 · `5.55 ms` (`67.1×`)，`33.91 dB`，`48.8 MiB` BF16 |
+| **Qwen-Image 2.1 (`v0.3` 小波版)** | 2D RGBA (`1x` Haar 小波) | [`07_Train_QwenImage21...v03...ipynb`](notebooks/07_Train_QwenImage21_PixelHead_v03_Colab_A100.ipynb) | [Wither033/ComfyUI-QwenImage21-PixelHead](https://github.com/Wither033/ComfyUI-QwenImage21-PixelHead) | [pocis/Qwen-Image-2.1-PixelHead](https://huggingface.co/pocis/Qwen-Image-2.1-PixelHead) | 可正常使用 · **`37.51 ms` (`17.9×`)，`33.81 dB`，`LPIPS 0.0736`**，`79.3 MiB` BF16 |
+| **Qwen-Image 2.1 (`v0.1` / `v0.2`)** | 2D RGBA (`1x` & `2x`) | [`01_...L4.ipynb`](notebooks/01_Train_QwenImage21_PixelHead_Colab_L4.ipynb) / [`06_...v02.ipynb`](notebooks/06_Train_QwenImage21_PixelHead_v02_Colab_A100.ipynb) | [Wither033/ComfyUI-QwenImage21-PixelHead](https://github.com/Wither033/ComfyUI-QwenImage21-PixelHead) | [pocis/Qwen-Image-2.1-PixelHead](https://huggingface.co/pocis/Qwen-Image-2.1-PixelHead) | 可正常使用 · `v0.1`：`7.77 ms` (`86.4×`)，`48.8 MiB`；`v0.2`：`115.05 ms`，`78.5 MiB` |
 | **Krea-2** | 2D RGB (`1x` & `2x`) | [`02_Train_Krea2...ipynb`](notebooks/02_Train_Krea2_PixelHead_Colab_L4.ipynb) | [Wither033/ComfyUI-Krea2-PixelHead](https://github.com/Wither033/ComfyUI-Krea2-PixelHead) | [pocis/Krea-2-PixelHead](https://huggingface.co/pocis/Krea-2-PixelHead) | 可正常使用 · `59.55 ms` (`24.7×`)，`33.33 dB`，`52.6 MiB` BF16 |
 | **FLUX.3-Image-Klein** | 2D RGB (`1x` & `2x`) | [`03_Train_Flux3Klein...ipynb`](notebooks/03_Train_Flux3Klein_PixelHead_Colab_L4.ipynb) | [`comfyui_nodes/ComfyUI-Flux3-PixelHead`](comfyui_nodes/ComfyUI-Flux3-PixelHead) | 暂未跑训练 | 代码与训练脚本已备好（`24.41M` 参数，`46.6 MiB` BF16） |
 | **LTX-2.5** | 3D 视频 (`8*T-7` 因果) | [`04_Train_LTX25_Video...ipynb`](notebooks/04_Train_LTX25_VideoPixelHead_v2_Colab_L4.ipynb) | [`comfyui_nodes/ComfyUI-LTX25-PixelHead`](comfyui_nodes/ComfyUI-LTX25-PixelHead) | 暂未跑训练 | `v2` 过完备脚本已备好（`23.87M` 参数，`2.67×` 过完备） |
@@ -53,6 +54,15 @@ $$\hat{x}_0 = x_t - \sigma_{\text{last}} \cdot v$$
 3. **末层投影保持过完备**：在进入最后一层 `out_proj` 前，尽量通过多级 `2× PixelShuffle` 让特征通道数 `w_final` 大于输出维度 `out_dim` 的 `2.5` 倍以上。对于 `32×32` 像素/Token 的 3D 视频模型，需要做三级上采样下探到 `4×4` 网格（`256 → 96` 或 `256 → 48`），避免停在 `8×8` 网格形成 `256 → 1536` 的线性降秩瓶颈。
 4. **末层 `out_proj` 固定使用 `FP32`**：主干可用 `BF16` 加速，但最后一层 `Linear -> RGB` 需关闭 autocast 保持 `float32`，否则暗部和平滑渐变会出现 `1～2` 个色阶的量化断层。
 5. **用 `TeacherVAE.decode(x0_hat)` 作为监督目标**：单步去噪得到的 $\hat{x}_0$ 已损失一部分被噪声掩盖的极高频信息，直接拿原图监督会迫使小网络输出模糊均值；拟合官方 VAE 对同一 $\hat{x}_0$ 的解码输出更稳定。
+
+### 3.3 兼顾微距锐度与低延迟的小波架构演进（`Qwen-Image 2.1 v0.1 → v0.2 → v0.3`）
+
+针对 `1024×1024` 近景人像毛孔、斜排票据细字与 `1px` 铜版交叉排线，`v0.3`（[`07_Train_QwenImage21_PixelHead_v03_Colab_A100.ipynb`](notebooks/07_Train_QwenImage21_PixelHead_v03_Colab_A100.ipynb)，单张 24GB L4 可跑完）做了三点改进：
+1. **2D Haar 小波四子带直出 + 解析 `iDWT`**：避开 `v0.2` 在 `1024×1024` 全图跑 `GroupNorm + 逐通道卷积` 的带宽瓶颈，在 `512×512` 小波网格用无归一化融合卷积预测 `(LL, LH, HL, HH)`，L4 耗时比 `v0.2` 快 **`3.07×`**（`115.05 ms → 37.51 ms`），激活显存下降 **`44.2%`**（`904 MiB → 504 MiB`）；
+2. **多尺度潜空间 `3×3` 空间直通桥（`LatentSpatialHighway`）**：对 `64` 通道 `x0_hat_norm` 做跨 Token 的 `3×3` 空间卷积并注入 `8px`、`4px`、`2px` 层，补齐跨块斜线连续性；
+3. **锁死低频 `LL.detach()` 的高频小波 PatchGAN**：判别器仅约束高频子带 `(LH, HL, HH)` 不动底色，使留出集 `LPIPS-VGG` 从 `0.1272 → 0.0808 → 0.0736` 持续下降的同时，总体 `PSNR` 同步升至 **`33.81 dB`**（人像子集均值 `39.17 dB`）。
+
+![Qwen-Image 2.1 v0.3 四方 1:1 像素对比](assets/qwen21_v03_hero_1to1.png)
 
 详细的新模型排查步骤与开发过程中遇到的 6 个具体问题见 [docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md](docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md)。
 

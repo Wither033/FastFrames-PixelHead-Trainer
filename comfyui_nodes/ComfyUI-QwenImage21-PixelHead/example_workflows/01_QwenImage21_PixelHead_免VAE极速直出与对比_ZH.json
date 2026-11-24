@@ -1,0 +1,787 @@
+{
+  "last_node_id": 15,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        40,
+        -250
+      ],
+      "size": [
+        1520,
+        200
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Qwen-Image 2.1 PixelHead：免 VAE 像素直出（v0.3 小波版 37.5ms）与原版 VAE 对比",
+      "properties": {
+        "Node name for S&R": "MarkdownNote",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "### Qwen-Image 2.1 Direct Pixel Head（免 VAE RGB + Alpha 直出 · v0.3）\n- **默认免 VAE 直出路径（`v0.3` 约 `37.5 ms`，`v0.1` 约 `5.5–7.8 ms`）**：`KSampler` 采样结束后由 `10. Pixel Head 免 VAE 解码` 将末步 `4096` 维特征与 `64` 通道潜变量直接还原为 RGB 与 Alpha 透明通道，无需加载 `644 MB` 官方 VAE。\n- **可选 1:1 同屏对比**：选中下方默认 Bypass 的紫色节点（`12`、`13`、`14`）按 **`Ctrl + B`** 开启，即可在同一随机种子下 1:1 对比官方原版 VAE。\n- **多模式兼容**：支持开/关 `8-Step LoRA`（开=8步 CFG 1.0；关=20~25步 CFG 3.5~4.5）、`QwenImage21Cache` 加速缓存、文生图及 `<image1>` 多参考图指令编辑。"
+      ],
+      "color": "#1e2d24",
+      "bgcolor": "#14221a"
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        430,
+        88
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            1
+          ]
+        }
+      ],
+      "title": "1. 加载 Qwen-Image 2.1 主模型",
+      "properties": {
+        "Node name for S&R": "UNETLoader",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "qwen-image-2.1-step90000-INT8-ConvRot-comfy.safetensors",
+        "default"
+      ],
+      "color": "#323",
+      "bgcolor": "#435"
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        145
+      ],
+      "size": [
+        430,
+        98
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "slot_index": 0,
+          "links": [
+            4
+          ]
+        }
+      ],
+      "title": "2. 加载 Qwen3-VL-8B 文本编码器",
+      "properties": {
+        "Node name for S&R": "CLIPLoader",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "qwen3-vl-8b-heretic-1.3.0_fp8_e4m3fn.safetensors",
+        "qwen_image",
+        "default"
+      ],
+      "color": "#323",
+      "bgcolor": "#435"
+    },
+    {
+      "id": 4,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        430,
+        88
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            2
+          ]
+        }
+      ],
+      "title": "3. 8步加速 LoRA（默认开启=8步；Ctrl+B 关闭改 25 步）",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "p_q_image_2.1_8_steps_v0.1_comfyui_bf16.safetensors",
+        1.0
+      ],
+      "color": "#323",
+      "bgcolor": "#435"
+    },
+    {
+      "id": 5,
+      "type": "QwenImage21Cache",
+      "pos": [
+        40,
+        405
+      ],
+      "size": [
+        430,
+        88
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            3
+          ]
+        }
+      ],
+      "title": "4. KV 前缀加速缓存",
+      "properties": {
+        "Node name for S&R": "QwenImage21Cache",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "auto",
+        "default"
+      ],
+      "color": "#323",
+      "bgcolor": "#435"
+    },
+    {
+      "id": 6,
+      "type": "QwenImage21PixelHeadLoader",
+      "pos": [
+        40,
+        535
+      ],
+      "size": [
+        430,
+        88
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "pixel_head",
+          "type": "QWEN21_PIXEL_HEAD",
+          "slot_index": 0,
+          "links": [
+            10
+          ]
+        }
+      ],
+      "title": "5. 加载 Qwen-Image 2.1 Pixel Head (v0.3 79.3 MB)",
+      "properties": {
+        "Node name for S&R": "QwenImage21PixelHeadLoader"
+      },
+      "widgets_values": [
+        "qwen_image_2.1_pixel_head_v03_bf16.safetensors",
+        "bf16_trunk_fp32_out"
+      ],
+      "color": "#1e2d24",
+      "bgcolor": "#264030"
+    },
+    {
+      "id": 7,
+      "type": "QwenImage21PixelHeadTap",
+      "pos": [
+        40,
+        660
+      ],
+      "size": [
+        430,
+        68
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "pixel_tap",
+          "type": "QWEN21_TAP",
+          "slot_index": 1,
+          "links": [
+            11
+          ]
+        }
+      ],
+      "title": "6. 挂载末步特征截获钩子 (Pixel Head Tap)",
+      "properties": {
+        "Node name for S&R": "QwenImage21PixelHeadTap"
+      },
+      "color": "#1e2d24",
+      "bgcolor": "#264030"
+    },
+    {
+      "id": 8,
+      "type": "TextEncodeQwenImage21",
+      "pos": [
+        510,
+        20
+      ],
+      "size": [
+        450,
+        300
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        },
+        {
+          "name": "images.image_1",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "slot_index": 1,
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 2,
+          "links": []
+        }
+      ],
+      "title": "7. 提示词与可选多图编辑条件编码",
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImage21",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "高质量日本 2D 二次元插画，赛璐璐平涂上色与锐利手绘黑色线稿。一位少年坐在阳光洒入的列车窗边，手拿印有清晰字样 \"QWEN 2.1\" 的车票，衣褶分明，画面干净细腻。",
+        "",
+        1024
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 9,
+      "type": "EmptyLatentImage",
+      "pos": [
+        510,
+        360
+      ],
+      "size": [
+        450,
+        108
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            8
+          ]
+        }
+      ],
+      "title": "8. 画幅尺寸（32 的倍数，如 1024×1024）",
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1
+      ],
+      "color": "#223",
+      "bgcolor": "#2a3b4c"
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [
+        1000,
+        20
+      ],
+      "size": [
+        340,
+        265
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 6
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 7
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            9,
+            13
+          ]
+        }
+      ],
+      "title": "9. KSampler（8步 euler/simple CFG 1.0）",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        20261122,
+        "fixed",
+        8,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ],
+      "color": "#223",
+      "bgcolor": "#2a3b4c"
+    },
+    {
+      "id": 11,
+      "type": "QwenImage21PixelDecode",
+      "pos": [
+        1000,
+        330
+      ],
+      "size": [
+        340,
+        125
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 9
+        },
+        {
+          "name": "pixel_head",
+          "type": "QWEN21_PIXEL_HEAD",
+          "link": 10
+        },
+        {
+          "name": "pixel_tap",
+          "type": "QWEN21_TAP",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image_rgb",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "alpha_mask",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": []
+        },
+        {
+          "name": "image_rgba",
+          "type": "IMAGE",
+          "slot_index": 2,
+          "links": []
+        }
+      ],
+      "title": "10. Pixel Head 免 VAE 解码 (直出 RGB+Alpha)",
+      "properties": {
+        "Node name for S&R": "QwenImage21PixelDecode"
+      },
+      "widgets_values": [
+        "auto"
+      ],
+      "color": "#1e2d24",
+      "bgcolor": "#264030"
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [
+        1380,
+        20
+      ],
+      "size": [
+        440,
+        435
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 12
+        }
+      ],
+      "outputs": [],
+      "title": "11. 保存 Pixel Head 直出成图",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "Qwen21_PixelHead_ZeroVAE"
+      ],
+      "color": "#1e2d24",
+      "bgcolor": "#264030"
+    },
+    {
+      "id": 13,
+      "type": "VAELoader",
+      "pos": [
+        510,
+        525
+      ],
+      "size": [
+        450,
+        68
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "slot_index": 0,
+          "links": [
+            14
+          ]
+        }
+      ],
+      "title": "12. [对比用] 官方原版 VAE（默认 Bypass，按 Ctrl+B 开启）",
+      "properties": {
+        "Node name for S&R": "VAELoader",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "qwen_image_2.1_vae_bf16.safetensors"
+      ],
+      "color": "#323",
+      "bgcolor": "#435"
+    },
+    {
+      "id": 14,
+      "type": "VAEDecode",
+      "pos": [
+        1000,
+        525
+      ],
+      "size": [
+        340,
+        68
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 13
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            15
+          ]
+        }
+      ],
+      "title": "13. [对比用] 原版 VAE 解码（Ctrl+B 开启）",
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core"
+      }
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [
+        1380,
+        500
+      ],
+      "size": [
+        440,
+        420
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [],
+      "title": "14. [对比用] 原版 VAE 成图（Ctrl+B 开启）",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [
+        "Qwen21_StockVAE_Ref"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      5,
+      0,
+      7,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      3,
+      0,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      5,
+      7,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      6,
+      8,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      8,
+      1,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      9,
+      0,
+      10,
+      3,
+      "LATENT"
+    ],
+    [
+      9,
+      10,
+      0,
+      11,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      6,
+      0,
+      11,
+      1,
+      "QWEN21_PIXEL_HEAD"
+    ],
+    [
+      11,
+      7,
+      1,
+      11,
+      2,
+      "QWEN21_TAP"
+    ],
+    [
+      12,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      10,
+      0,
+      14,
+      0,
+      "LATENT"
+    ],
+    [
+      14,
+      13,
+      0,
+      14,
+      1,
+      "VAE"
+    ],
+    [
+      15,
+      14,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.78,
+      "offset": [
+        80,
+        320
+      ]
+    }
+  },
+  "version": 0.4
+}
