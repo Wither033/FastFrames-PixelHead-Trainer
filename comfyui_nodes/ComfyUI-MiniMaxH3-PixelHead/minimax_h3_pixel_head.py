@@ -1,4 +1,4 @@
-"""Clean-room PyTorch implementation of 3D Non-Uniform Video Direct Pixel Head for MiniMax-H3.
+"""PyTorch implementation (adapted from Seunghyun Ji / sorryhyun's anima_lora & FastFrames) of 3D Non-Uniform Video Direct Pixel Head for MiniMax-H3.
 
 License: MIT
 Architecture v2 (Overcomplete 3-Stage Spatial Shuffle + Unified Frame-Timeline Causal 3D Refinement)

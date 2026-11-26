@@ -1,4 +1,4 @@
-"""Clean-room PyTorch implementation of Direct Pixel Readout Head for FLUX.3-Image-Klein.
+"""PyTorch implementation (adapted from Seunghyun Ji / sorryhyun's anima_lora & FastFrames) of Direct Pixel Readout Head for FLUX.3-Image-Klein.
 
 License: MIT
 Architecture follows the public mathematical formulation of FastFrames (arXiv:2611.23226):

@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2026
+Copyright (c) 2026 Seunghyun Ji (sorryhyun) — original Anima Pixel Decoder (`sorryhyun/anima_lora`, `sorryhyun/anima_pixel_decoder`, `sorryhyun/ComfyUI-Anima-PixelDecoder`) pixel head architecture, ComfyUI tap-and-decode workflow, and Replay Buffer / wavelet distillation pipeline
+Copyright (c) 2026 Wither033 / pocis — Qwen-Image 2.1, Krea-2, and MiniMax-H3 adaptations, multi-scale LatentSpatialHighway, and ComfyUI multi-backbone training scripts
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

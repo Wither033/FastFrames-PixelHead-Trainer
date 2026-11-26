@@ -1,4 +1,4 @@
-"""Clean-room PyTorch implementation of 3D Causal Video Direct Pixel Head for LTX-2.5 (`LTXAVModel` / `LTXVModel`).
+"""PyTorch implementation (adapted from Seunghyun Ji / sorryhyun's anima_lora & FastFrames) of 3D Causal Video Direct Pixel Head for LTX-2.5 (`LTXAVModel` / `LTXVModel`).
 
 License: MIT
 Architecture v2 (Overcomplete Spatiotemporal Shuffle, zero linear rank bottleneck) follows FastFrames (arXiv:2611.23226):

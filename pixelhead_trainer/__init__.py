@@ -1,4 +1,4 @@
-"""Clean-room PyTorch toolkit for training Zero-VAE Direct Pixel Readout Heads (2D & 3D Video).
+"""PyTorch toolkit (adapted from Seunghyun Ji / sorryhyun's anima_lora & FastFrames) for training Zero-VAE Direct Pixel Readout Heads (2D & 3D Video).
 
 License: MIT
 Mathematical formulation inspired by FastFrames (arXiv:2611.23226) and single-step

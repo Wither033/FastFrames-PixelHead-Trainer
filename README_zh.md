@@ -11,7 +11,7 @@
 
 主流流匹配扩散模型（DiT）在最后一层线性映射（`proj_out / linear`）之前拥有 `3072～6144` 维的逐 Token 特征，传统管线先将其压缩到 `16～128` 通道潜空间，再调用几百 MB 到数 GB 的 2D/3D VAE 解码器还原成图像或视频，高分辨率出图时也经常在最后一步 `VAEDecode` 爆显存。
 
-本项目参考 Apple Research 论文 [*FastFrames* (`arXiv:2611.23226`)](https://arxiv.org/abs/2611.23226) 的直接像素读出结构与 `sorryhyun/anima-pixel-decoder` 的单步加噪重放池（Replay Buffer）蒸馏思路，把我们自己独立编写的通用 PyTorch 训练库 `pixelhead_trainer`、5 个底座模型的 ComfyUI 特征截获代码以及单张 Colab L4（24GB）训练 Notebook 整理开源：
+本项目衍生并扩展自原作者 **[Seunghyun Ji (`sorryhyun`)](https://huggingface.co/sorryhyun)** 在 **[`sorryhyun/anima_lora`](https://github.com/sorryhyun/anima_lora)**、**[`sorryhyun/anima_pixel_decoder`](https://huggingface.co/sorryhyun/anima-pixel-decoder)** 与 **[`sorryhyun/ComfyUI-Anima-PixelDecoder`](https://github.com/sorryhyun/ComfyUI-Anima-PixelDecoder)**（MIT License，`Copyright (c) 2026 Seunghyun Ji`）中提出的像素头架构、ComfyUI `Tap + Decode` 范式及单步 `ReplayBuffer` / 小波对抗蒸馏管线，并结合 Apple Research 论文 [*FastFrames* (`arXiv:2611.23226`)](https://arxiv.org/abs/2611.23226) 的直接像素读出框架，适配了 5 个主流 ComfyUI 扩散底座与单卡 Colab L4/A100 训练脚本：
 
 - 在 `16×16` 像素/Token 的 **2D 图像模型**上，`48.8～79.3 MiB`（BF16）的像素头可将解码耗时缩短 `17.9～86.4` 倍（其中 **`Qwen-Image 2.1 v0.3` 小波高保真版**在 L4 `1024²` 下耗时 `37.51 ms`、均值 `33.81 dB`、`LPIPS 0.0736`；`v0.1` 快速版耗时 `5.55～7.77 ms`；**`Krea-2`** 耗时 `59.55 ms`、均值 `33.33 dB`），并支持二阶 `2x`（`1024 → 2048`）一步放大输出。
 - 在单 Token 覆盖 `4×32×32` 甚至 `8×32×32` 像素的 **高压缩比 3D 视频模型**（如 `MiniMax-H3`）上，实测如果只用纯像素空间 `MSE` 训练，虽然解码速度快 `8.5` 倍，但复杂自然纹理会出现明显的平滑涂抹感——相关原因与改进方向均已如实记录在 [docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md](docs/PLAYBOOK_ADAPTING_NEW_MODELS_ZH.md) 中。
@@ -95,9 +95,9 @@ pip install -e .
 CUDA_VISIBLE_DEVICES="" python tests/test_all_heads_and_gates.py
 ```
 
-## 7. 开源协议与参考致谢
+## 7. 原作者署名、致谢与开源协议
 
-- **代码许可**：MIT License（独立编写的 PyTorch 与 ComfyUI 代码；针对特定底座训练出的模型权重分发时请同时留意对应底模本身的许可要求）。
-- **参考资料**：
-  - 直接像素读出、降维桥与梯度损失定义参考 [*FastFrames: Video Generation at Interactive Latency*](https://arxiv.org/abs/2611.23226)（Gene Chou et al., 2026）；
-  - 单步 Teacher-Forced Replay Buffer 训练方式与 ComfyUI 钩子挂载思路参考 [`sorryhyun/anima-pixel-decoder`](https://huggingface.co/sorryhyun/anima-pixel-decoder)。
+
+- **原作者与核心管线致谢**：本项目的像素头核心结构、ComfyUI `Tap + Decode` 挂载范式及训练管线（包括无跳连 ConvNeXt + `2× PixelShuffle` `1x/2x` 解码结构、末层线性映射前 `f_u + g·(f_c - f_u)` 特征截获与潜变量块融合、基于 `VAE(x̂0)` 的跨 Base/Turbo 单步 `ReplayBuffer` 蒸馏、RGBA 四通道读出，以及 `v0.3` 的 2D Haar 小波子带预测与锁定低频 `LL` 的高频对抗训练思路）衍生并改编自原作者 **[Seunghyun Ji (`sorryhyun`)](https://huggingface.co/sorryhyun)**（[GitHub `@sorryhyun`](https://github.com/sorryhyun)）在 **[`sorryhyun/anima_lora`](https://github.com/sorryhyun/anima_lora)**、**[`sorryhyun/anima_pixel_decoder`](https://huggingface.co/sorryhyun/anima-pixel-decoder)** 与 **[`sorryhyun/ComfyUI-Anima-PixelDecoder`](https://github.com/sorryhyun/ComfyUI-Anima-PixelDecoder)** 中的开创性开源工作（MIT License，`Copyright (c) 2026 Seunghyun Ji`）。特此向原作者 `sorryhyun` 致谢！
+- **基础论文参考**：直接像素读出（Direct Pixel Readout）理论框架参考 [*FastFrames: Video Generation at Interactive Latency* (`arXiv:2611.23226`)](https://arxiv.org/abs/2611.23226)（Gene Chou et al., Apple & Cornell, 2026）。
+- **开源协议**：[MIT License](LICENSE)（完整保留原作者 `Copyright (c) 2026 Seunghyun Ji` 版权声明；配合各扩散底座模型使用时请同时遵守对应底模的许可证条款）。

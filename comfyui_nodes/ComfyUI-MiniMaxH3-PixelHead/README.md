@@ -13,4 +13,4 @@
 Taps `diffusion_model.final_layer` (`5376`-dim `mod(video_seg)` tokens — compatible with both 8-Step PDD Turbo and standard Base/Ref2VA checkpoints) + denoised `24`-ch `(1,2,2)` video latent (`d_lat=96`), using three `2x` spatial PixelShuffle stages (`32px -> 16px -> 8px -> 4px`), non-uniform `(1, 4, 4, 4, 4)` temporal expansion onto the unified frame timeline, frame-level causal 3D ConvNeXt refinement, and a `5.33x` overcomplete FP32 head (`256 -> 48`).
 
 ## License
-MIT License (100% clean-room implementation).
+MIT License — adapted from [Seunghyun Ji (`sorryhyun`)](https://github.com/sorryhyun)'s [`anima_lora`](https://github.com/sorryhyun/anima_lora) / [`sorryhyun/anima_pixel_decoder`](https://huggingface.co/sorryhyun/anima-pixel-decoder) (`Copyright (c) 2026 Seunghyun Ji`) and [*FastFrames* (`arXiv:2611.23226`)](https://arxiv.org/abs/2611.23226).

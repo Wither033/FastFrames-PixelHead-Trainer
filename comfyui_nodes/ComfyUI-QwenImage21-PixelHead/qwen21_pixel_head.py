@@ -1,4 +1,4 @@
-"""Clean-room PyTorch implementation of Direct Pixel Readout Head for Qwen-Image 2.1 (v0.1, v0.2 & v0.3).
+"""PyTorch implementation (adapted from Seunghyun Ji / sorryhyun's anima_lora & FastFrames) of Direct Pixel Readout Head for Qwen-Image 2.1 (v0.1, v0.2 & v0.3).
 
 License: MIT
 Supports:
